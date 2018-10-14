@@ -44,40 +44,39 @@ int ReceiveUartMessage(uint8_t* payloadReceived, HardwareSerial* _vescserialPort
 	int counter = 0;
 	int endMessage = 256;
 	int lenPayload = 0;
-	uint8_t messageReceived[256];
+	uint8_t	msgMetadata[3];
 	const char terminator = 0x03;
 	bool unpacked = false;
 	
 	_vescserialPort->setTimeout(RX_TIMEOUT); // set timeout for messge recieve
 
-   	counter +=  _vescserialPort->readBytes(messageReceived, 2); // get payload size
+   	counter +=  _vescserialPort->readBytes(msgMetadata, 3); // get payload size
 
-		switch (messageReceived[0]){
+		switch (msgMetadata[0]){
 		case 2:
-			lenPayload = messageReceived[1];
+			lenPayload = msgMetadata[1];
 			endMessage = lenPayload + 5; //Payload size + 2 for sice + 3 for SRC and End.
-
 			break;
 		case 3:   // must be careful that rx buffer does not overflow.
-			// counter +=  _vescserialPort->readBytes(&messageReceived[counter], 1); // get additional payload size byte
-			// lenPayload = (messageReceived[1]<<8) + messageReceived[2]; // is this the right endian?
-			// endMessage = lenPayload + 5; //Payload size + 2 for sice + 3 for SRC and End.
-		
-			// uint8_t* bigmessageReceived[endMessage];
-
-			// memcpy(&messageReceived, &bigmessageReceived, counter+1);
-			// delete [] messageReceived;
-			// messageReceived = bigmessageReceived;
-			// //ToDo: finish Adding Message Handling > 255 (starting with 3)
+			lenPayload = (msgMetadata[1]<<8) + msgMetadata[2]; // is this the right endian?
+			endMessage = lenPayload + 5; //Payload size + 2 for sice + 3 for SRC and End.
+			//ToDo: test Message Handling > 255 (starting with 3)
 			break;
 		default:
-			break;
+			// lenPayload = 0;
+			// endMessage = lenPayload + 5;
+			return 0;
+			//break;
 		}
+	uint8_t messageReceived[endMessage];
+	memcpy(&messageReceived, &msgMetadata, counter);
 
 	counter +=  _vescserialPort->readBytes(&messageReceived[counter], endMessage-counter); // get payload, crc, endbyte
 
+	//debugSerialPort->print("Received raw: "); SerialPrint(messageReceived, counter); debugSerialPort->println();
+
 	if (counter == endMessage && messageReceived[endMessage - 1] == terminator) {
-		messageReceived[endMessage] = 0;
+		//messageReceived[endMessage] = 0;
 		if (debugSerialPort != NULL) {
 			debugSerialPort->println("End of message reached!");
 		}
